@@ -16,7 +16,7 @@ var lastID int
 // User struct
 type User struct {
 	ID        int       `json:"id"`
-	FisrtName string    `json:"first_name"`
+	FirstName string    `json:"first_name"`
 	LastName  string    `json:"last_name"`
 	Email     string    `json:"email"`
 	CreatedAt time.Time `json:"created_at"`
@@ -27,7 +27,19 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func usersHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, "Get UserInfo by /users/{id}")
+	if len(userMap) == 0 {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "No Users")
+	}
+	users := []*User{}
+	for _, u := range userMap {
+		users = append(users, u)
+	}
+
+	data, _ := json.Marshal(users)
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, string(data))
 }
 
 func getUserInfoHandler(w http.ResponseWriter, r *http.Request) {
@@ -92,6 +104,41 @@ func deleteUserHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func updateUserHandler(w http.ResponseWriter, r *http.Request) {
+	updateUser := new(User)
+	err := json.NewDecoder(r.Body).Decode(updateUser)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, err)
+		return
+	}
+
+	user, ok := userMap[updateUser.ID]
+
+	if !ok {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "No User ID:", updateUser.ID)
+		return
+	}
+
+	if updateUser.FirstName != "" {
+		user.FirstName = updateUser.FirstName
+	}
+	if updateUser.LastName != "" {
+		user.LastName = updateUser.LastName
+	}
+	if updateUser.Email != "" {
+		user.Email = updateUser.Email
+	}
+
+	userMap[updateUser.ID] = updateUser
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	data, _ := json.Marshal(updateUser)
+	fmt.Fprint(w, string(data))
+
+}
+
 // NewHandler make a new myapp handler
 func NewHandler() http.Handler {
 	mux := mux.NewRouter()
@@ -101,6 +148,7 @@ func NewHandler() http.Handler {
 	mux.HandleFunc("/", indexHandler)
 	mux.HandleFunc("/users", usersHandler).Methods("GET") //test를 처음에 '/users/test'로 요청을 보내도 테스트가 성공하는데, 이는 요청이 없는 경우에 자동으로 그 상위 요청하기 때문.
 	mux.HandleFunc("/users", createUserInfoHandler).Methods("POST")
+	mux.HandleFunc("/users", updateUserHandler).Methods("PUT")
 	mux.HandleFunc("/users/{id:[0-9]+}", getUserInfoHandler).Methods("GET")
 	mux.HandleFunc("/users/{id:[0-9]+}", deleteUserHandler).Methods("DELETE")
 	return mux
